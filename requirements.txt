@@ -28,7 +28,7 @@ future==0.18.2
 gast==0.2.2
 google-auth==2.9.1
 google-auth-oauthlib==0.4.1
-google-pasta==0.1.8
+google-pasta==0.2.0
 grpcio==1.25.0
 h5py==2.10.0
 idna==2.8
