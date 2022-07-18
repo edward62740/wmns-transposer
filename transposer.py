@@ -16,6 +16,7 @@ class SensorContainer:
             value = row[1]
             field = row[2]
             uid = row[3]
+            # Change or remove stype filters as necessary
             if stype != 'Battery' and stype != 'Status':
                 # Returns SensorType if there exists such an instance with stype
                 instance = _SensorType.find(stype)

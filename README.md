@@ -1,6 +1,16 @@
 # WMNS TRANSPOSER
 
-Python script to transpose InfluxDB time-series data to Firebase RTDB. Takes in the returned results from a flux "|> last()" query in the form of a list _results_
+Python script to transpose InfluxDB time-series data to Firebase RTDB.
+
+## Usage
+
+Import transposer
+
+```python
+from transposer import SensorContainer
+```
+
+Takes in the returned results from a flux "|> last()" query in the form of a list _results_
 with fluxrecord elements _measurement, _value, _field and a user-defined id value.
 
 ```python
@@ -34,6 +44,12 @@ SensorContainer
 |   ...
 ...
 ```
+
+Update SensorContainer. Adds new and overwrites existing. Deletions not supported.
+```python
+container.update_all(results)
+```
+
 
 Get the above structure as dict
 ```python
