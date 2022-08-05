@@ -26,13 +26,15 @@ query = ' from(bucket: "")\
   |> range(start: -1h)\
   |> last()'
 
+
 # Initialize Firebase Admin SDK
 cred = credentials.Certificate('firebase-adminsdk-key.json')
-default_app = firebase_admin.initialize_app(cred, {
-    'databaseURL': ''
-})
-
-s = sched.scheduler(time.time, time.sleep)
+try:
+    default_app = firebase_admin.initialize_app(cred, {
+        'databaseURL': ''
+    })
+except ValueError:
+    print("Firebase already initialized")
 
 
 def main_task(sc):
@@ -43,16 +45,27 @@ def main_task(sc):
         for record in table.records:
             results.append((record.get_measurement(), record.get_value(), record.get_field(), record["UID"]))
     # Update the SensorContainer with the latest data
-    container.update_all(results)
+    try:
+        container.update_all(results, "Status", "Reset", "Battery")
+    except ValueError as e:
+        print(e)
     out = container.get_all()
     # Write the data to Firebase
-    db.reference("/").update(out)
+    try:
+        db.reference("/").update(out)
+        print(f"Json data size: {getsizeof(out)}")
+    except ValueError:
+        print("This should not happen unless invalid UID is passed")
+    except FirebaseError as e:
+        print(e)
 
     # Schedule the next update
     sc.enter(update_frequency, 1, main_task, (sc,))
 
 
-# Initialize the SensorContainer
-container = SensorContainer([])
-s.enter(update_frequency, 1, main_task, (s,))
-s.run()
+if __name__ == "__main__":
+    s = sched.scheduler(time.time, time.sleep)
+    # Initialize the SensorContainer
+    container = SensorContainer([], "PMS")
+    s.enter(update_frequency, 1, main_task, (s,))
+    s.run()

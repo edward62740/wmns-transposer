@@ -1,42 +1,55 @@
+import re
+
+
 class SensorContainer:
     """ SensorContainer class containing all the SensorType instances
     Pass raw data from InfluxDB last() into this class object
     """
 
-    def __init__(self, raw):
-        """ Initialize SensorContainer class. """
+    def __init__(self, raw, *ignore):
+        """ Initialize SensorContainer class
+        :param raw: raw data from InfluxDB last(). This can be empty
+        :param *ignore: list of sensor types to ignore
+        :return: SensorContainer object
+        """
         self.sensorTypeList = []
+        self.sensorIgnoreList = [items for items in ignore]
         self.sensorRawList = raw
         self.update_all(raw)
+        print(self.sensorIgnoreList)
 
-    def update_all(self, raw):
-        """ Update all the SensorType instances in the container. """
+    def update_all(self, raw, *meas):
+        """ Update all the SensorType instances in the container
+         :param raw: raw data from InfluxDB last()
+         :param *meas: list of sensor types to be regarded as measurements instead
+         :return: ValueError if
+         """
         for row in raw:
-            stype = row[0]
-            value = row[1]
-            field = row[2]
-            uid = row[3]
-            # Change or remove stype filters as necessary
-            if stype != 'Battery' and stype != 'Status':
-                # Returns SensorType if there exists such an instance with stype
-                instance = _SensorType.find(stype)
-                # Update the SensorType instance if there exists such an instance
-                if len(instance) > 0 and instance[0].get_stype() == stype:
-                    instance[0].update_sensor(value, field, uid)
-                # Create a new SensorType instance if there does not exist such an instance
+            stype, value, field, uid = map(str, row[0:4])
+            try:
+                if any(m == stype for m in meas):
+                    instance = _Sensor.find(uid)
+                    if len(instance) > 0:
+                        instance[0].update_data(value, field)
                 else:
-                    self.sensorTypeList.append(_SensorType(stype, value, field, uid))
-
-            elif stype == 'Status' or stype == 'Battery':
-                instance = _Sensor.find(uid)
-                if len(instance) > 0:
-                    instance[0].update_data(value, field)
+                    # Returns SensorType if there exists such an instance with stype
+                    instance = _SensorType.find(stype)
+                    # Update the SensorType instance if there exists such an instance
+                    if len(instance) > 0 and instance[0].get_stype() == stype:
+                        instance[0].update_sensor(value, field, uid)
+                    # Create a new SensorType instance if there does not exist such an instance
+                    else:
+                        self.sensorTypeList.append(_SensorType(stype, value, field, uid))
+            except (ValueError, TypeError):
+                print("Error updating SensorContainer")
 
     def get_all(self):
         """ Return all the SensorType instances in the container. """
         container_data = {}
         for element in self.sensorTypeList:
-            container_data.update({element.get_stype(): element.get_sensor_data()})
+            # Append to container_data if the sensor type is not in ignore list
+            if element.get_stype() not in self.sensorIgnoreList:
+                container_data.update({element.get_stype(): element.get_sensor_data()})
         return container_data
 
 
@@ -45,13 +58,11 @@ class _SensorType(object):
     Constructor should be called if classmethod find(stype) does not return any
     instances of SensorType stype
     """
-    instances = [] # List to store all the instances of SensorType
+    instances = []  # List to store all the instances of SensorType
 
     def __init__(self, stype, data, measurement, uid):
         self.sensorList = []
         self.stype = stype
-        instance = _Sensor.find(uid)
-
         self.update_sensor(data, measurement, uid)
         _SensorType.instances.append(self)
 
@@ -66,7 +77,7 @@ class _SensorType(object):
 
         if len(instance) > 0 and instance[0].get_uid() == uid:
             instance[0].update_data(data, measurement)
-            # Create a new SensorType instance if there does not exist such an instance
+        # Create a new SensorType instance if there does not exist such an instance
         else:
             self.sensorList.append(_Sensor(data, measurement, uid))
 
@@ -86,7 +97,7 @@ class _Sensor(object):
     Constructor should be called if classmethod find(uid) does not return any
     instances of Sensor uid.
     """
-    sensors = [] # List to store all the instances of Sensor
+    sensors = []  # List to store all the instances of Sensor
 
     def __init__(self, data, measurement, uid):
         self.readings = {}
@@ -98,7 +109,8 @@ class _Sensor(object):
         return {self.uid: self.readings}
 
     def update_data(self, data, measurement):
-        self.readings.update({measurement: data})
+        #  Removes all invalid characters from the measurement
+        self.readings.update({re.sub('[^A-Za-z0-9]+', '', measurement): float(data)})
 
     def get_uid(self):
         return self.uid
